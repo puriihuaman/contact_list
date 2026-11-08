@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from exceptions.contact_not_found_error import ContactNotFoundError
@@ -56,31 +57,40 @@ class Agenda:
                 "El contacto que intentas actualizar no existe. Por favor, verifique que exista."
             )
 
-        if "name" in partial_update or "phone" in partial_update or "email" in partial_update or "category" in partial_update:
-            new_phone = partial_update["phone"]
+        if not isinstance(partial_update, dict):
+            raise TypeError("La actualización parcial debe ser un diccionario.")
 
-            if new_phone != contact.phone and self.__phone_exists(new_phone):
-                raise DuplicatePhoneError(
-                    "Contacto duplicado",
-                    f"El teléfono {new_phone} ya pertenece a otro contacto."
-                )
+        if not partial_update:
+            return
 
-            new_email = partial_update["email"]
+        if len(partial_update) != 1:
+            raise ValueError("Solo se puede actualizar un campo por llamada.")
 
-            if new_email != contact.email and self.__email_exists(new_email):
-                raise DuplicateEmailError(
-                    "Contacto duplicado",
-                    f"El email {new_email} ya pertenece a otro contacto."
-                )
+        field, new_value = next(iter(partial_update.items()))
+        valid_fields = {"name", "phone", "email", "category"}
 
-            new_name = partial_update["name"] if partial_update["name"] is not None else contact.name
+        if field not in valid_fields:
+            raise ValueError(f"El campo '{field}' no se puede actualizar.")
 
-            new_category = partial_update["category"] if partial_update["category"] is not None else contact.category
+        current_value = getattr(contact, field)
 
-            contact.name = new_name
-            contact.phone = new_phone
-            contact.email = new_email
-            contact.category = new_category
+        if field == "phone" and new_value != current_value and self.__phone_exists(new_value):
+            raise DuplicatePhoneError(
+                "Contacto duplicado",
+                f"El teléfono {new_value} ya pertenece a otro contacto."
+            )
+
+        if field == "email" and new_value != current_value and self.__email_exists(new_value):
+            raise DuplicateEmailError(
+                "Contacto duplicado",
+                f"El email {new_value} ya pertenece a otro contacto."
+            )
+
+        if new_value == current_value:
+            return
+
+        setattr(contact, field, new_value)
+        contact.updated_at = datetime.now()
 
     def __phone_exists(self, phone: str) -> bool:
         return any(contact.phone == phone for contact in self.__contacts)

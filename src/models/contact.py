@@ -29,7 +29,6 @@ class Contact:
     @name.setter
     def name(self, name: str) -> None:
         self.__name = Contact.__validate_name(name)
-        self.__updated_at = datetime.now()
 
     @property
     def phone(self) -> str:
@@ -38,7 +37,6 @@ class Contact:
     @phone.setter
     def phone(self, phone: str) -> None:
         self.__phone = Contact.__validate_phone(phone)
-        self.__updated_at = datetime.now()
 
     @property
     def email(self) -> str:
@@ -47,7 +45,6 @@ class Contact:
     @email.setter
     def email(self, email: str) -> None:
         self.__email = Contact.__validate_email(email)
-        self.__updated_at = datetime.now()
 
     @property
     def category(self) -> Category:
@@ -56,7 +53,6 @@ class Contact:
     @category.setter
     def category(self, category: Category) -> None:
         self.__category = Contact.__validate_category(category)
-        self.__updated_at = datetime.now()
 
     @property
     def created_at(self) -> datetime:
@@ -65,6 +61,10 @@ class Contact:
     @property
     def updated_at(self) -> datetime:
         return self.__updated_at
+
+    @updated_at.setter
+    def updated_at(self, updated_at: datetime) -> None:
+        self.__updated_at = updated_at
 
     def to_dict(self) -> dict[str, str]:
         return {
