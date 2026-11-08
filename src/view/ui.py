@@ -1,21 +1,22 @@
 from datetime import datetime
 
-from auth_manager import AuthManager
-from config import CATEGORIES
+from auth.auth_manager import AuthManager
 from exceptions.blocked_user_error import BlockedUserError
 from exceptions.contact_not_found_error import ContactNotFoundError
+from exceptions.duplicate_email_error import DuplicateEmailError
 from exceptions.duplicate_phone_error import DuplicatePhoneError
 from exceptions.duplicate_user_error import DuplicateUserError
 from exceptions.user_not_found_error import UserNotFoundError
 from models.agenda import Agenda
+from models.category import Category
 from models.contact import Contact
 from models.user import User
 
 
-def auth_menu():
+def auth_menu() -> int:
     MENU_AUTH = '''
     --- SISTEMA DE SEGURIDAD ---
-    
+
     [1] Iniciar sesión
     [2] Registrarse
     [3] Salir
@@ -25,7 +26,7 @@ def auth_menu():
     return get_valid_option('Seleccione una opción: ', (1, 2, 3))
 
 
-def register_ui() -> None:
+def register_user(auth_manager: AuthManager) -> None:
     try:
         name = get_name_user("Ingrese su nombre: ")
         lastname = get_lastname("Ingrese su apellido: ")
@@ -35,7 +36,7 @@ def register_ui() -> None:
 
         user = User(name, lastname, username, email, password)
 
-        AuthManager.register_user(user)
+        auth_manager.register_user(user)
         print(f"\nEl usuario {username} ha sido registrado correctamente.")
 
     except DuplicateUserError as e:
@@ -43,7 +44,7 @@ def register_ui() -> None:
         print("Por favor, intente registrarse nuevamente.\n")
 
 
-def login_user() -> User | None:
+def login_user(auth_manager: AuthManager) -> User | None:
     print("\n--- INICIAR SESIÓN ---")
 
     attempts = 0
@@ -54,7 +55,7 @@ def login_user() -> User | None:
         password = input("Ingrese su contraseña: ").strip()
 
         try:
-            current_user = AuthManager.login_user(username, password)
+            current_user = auth_manager.login_user(username, password)
             print(f"\n¡Bienvenido {current_user.name} {current_user.lastname}!")
 
             return current_user
@@ -69,7 +70,7 @@ def login_user() -> User | None:
             attempts += 1
 
             if attempts >= max_attempts:
-                AuthManager.lock_user(username)
+                auth_manager.lock_user(username)
 
                 print(f"\nError: Máximo de intentos agotados.")
                 return None
@@ -97,47 +98,51 @@ def menu() -> int:
     return get_valid_option('Seleccione una opción: ', (1, 2, 3, 4, 5, 6, 0))
 
 
-def get_name_contact(prompt: str = "Ingrese el nombre: "):
+def get_name_contact(prompt: str = "Ingrese el nombre: ") -> str:
     return get_name(prompt)
 
 
-def get_phone_contact(prompt: str = "Ingrese el teléfono: "):
+def get_phone_contact(prompt: str = "Ingrese el teléfono: ") -> str:
     while True:
         phone = input(prompt)
+        clean_phone = phone.strip()
 
-        if not phone.strip() or len(phone) != 9:
+        if not clean_phone or len(clean_phone) != 9 or not clean_phone.isdigit():
             print("\nEl teléfono debe tener exactamente 9 números. Por favor, ingrese un teléfono válido.\n")
         else:
-            return phone.strip()
+            return clean_phone
 
 
-def get_email(prompt: str = "Ingrese el email: "):
+def get_email(prompt: str = "Ingrese el email: ") -> str:
     while True:
         email = input(prompt)
+        clean_email = email.strip()
 
-        if not email.strip() or len(email) < 12:
+        if not clean_email or len(clean_email) < 12:
             print("\nEl email debe tener entre 12 caracteres mínimo. Por favor, ingrese un email válido.\n")
         else:
-            return email.strip()
+            return clean_email
 
 
-def get_category_contact():
+def get_category_contact() -> Category:
     while True:
         print("Categorías:")
-        for key, category in enumerate(CATEGORIES):
-            print(f"\t[{key + 1}] {category}")
+        categories: list[Category] = list(Category)
 
-        category = input(f"Seleccione la categoría ({'/'.join(CATEGORIES)}): ")
+        for key, category in enumerate(Category):
+            print(f"\t[{key + 1}] {category.value}")
+
+        category = input(f"Seleccione la categoría ({'/'.join(c.value for c in categories)}): ")
 
         try:
             category = int(category) - 1
 
-            if category >= len(CATEGORIES) or category < 0:
+            if category >= len(categories) or category < 0:
                 print(
                     "\nEl número ingresado no identifica a ninguna categoría en la lista de categorías",
                     "Por favor, ingrese un número válido de categoría.\n")
             else:
-                return CATEGORIES[category]
+                return categories[category]
         except ValueError:
             print(
                 "\nEl número de categoría debe ser un número. Por favor, ingrese un número válido de categoría.\n")
@@ -164,7 +169,7 @@ def add_contact(agenda: Agenda) -> None:
 
             if not should_continue("¿Desea agregar otro contacto? (s/n): "):
                 break
-        except DuplicatePhoneError as e:
+        except (DuplicatePhoneError, DuplicateEmailError) as e:
             print(f"\nError: {e.message}. {e.details}")
             print("Por favor, intente registrar de nuevo.\n")
 
@@ -225,7 +230,7 @@ def show_contacts(agenda: Agenda, contacts: list[Contact] | None = None) -> None
     print("\nLISTA DE CONTACTOS:")
 
     for i, contact in enumerate(contacts_to_show, start=1):
-        print(f"\t{i}. {contact.name} - {contact.phone} - {contact.email} - {contact.category}")
+        print(f"\t{i}. {contact.name} - {contact.phone} - {contact.email} - {contact.category.value}")
 
         created = format_relative_time(contact.created_at)
         updated = format_relative_time(contact.updated_at)
@@ -246,6 +251,17 @@ def get_position_contact(prompt: str, contact_list_size: int) -> int:
             print('\nEntrada inválida. Por favor, ingrese un número.\n')
 
 
+def get_phone_for_call(prompt: str = "Ingrese el teléfono del contacto a llamar: ") -> str:
+    while True:
+        phone = input(prompt)
+        clean_phone = phone.strip()
+
+        if not clean_phone or len(clean_phone) != 9 or not clean_phone.isdigit():
+            print("\nEl teléfono debe tener exactamente 9 números. Por favor, ingrese un teléfono válido.\n")
+        else:
+            return clean_phone
+
+
 def call_contact(agenda: Agenda) -> None:
     show_contacts(agenda)
 
@@ -254,12 +270,9 @@ def call_contact(agenda: Agenda) -> None:
         return
 
     while True:
-        position = get_position_contact(
-            'Seleccione una posición del contacto a llamar: ',
-            len(agenda.get_contacts())
-        )
+        phone_number = get_phone_for_call("Ingrese el teléfono del contacto a llamar: ")
 
-        contact = agenda.call_contact(position)
+        contact = agenda.call_contact(phone_number)
         print(f"\nLlamando a {contact.name}: 📞 {contact.phone} ~~~~\n")
 
         if not should_continue("¿Desea seguir llamando? (s/n): "):
@@ -279,8 +292,10 @@ def delete_contact(agenda: Agenda) -> None:
             len(agenda.get_contacts())
         )
 
+        contact = agenda.get_contacts()[position]
+
         try:
-            agenda.delete_contact(position)
+            agenda.delete_contact(contact.contact_id)
             print("\nContacto eliminado correctamente.\n")
             break
         except ContactNotFoundError as e:
@@ -300,41 +315,43 @@ def update_contact(agenda: Agenda) -> None:
     )
 
     while True:
-        if not agenda.get_contact_by_index(position):
+        contact = agenda.get_contact_by_index(position)
+
+        if not contact:
             print("\n\nPosición incorrecta del contacto. Por favor, digite una posición de un contacto existente.\n")
-            continue
-        else:
+            break
 
-            try:
-                contact = agenda.get_contact_by_index(position)
+        try:
+            # contact = agenda.get_contact_by_index(position)
 
-                if not contact:
-                    print('\nError: No se encontró el contacto. Por favor, verifique que exista.\n')
-                    return
+            if not contact:
+                print('\nError: No se encontró el contacto. Por favor, verifique que exista.\n')
+                return
 
-                choice = get_update_field_option()
+            choice = get_update_field_option()
 
-                match choice:
-                    case 1:
-                        name = get_name_contact('Ingrese el nuevo nombre: ')
-                        contact.name = name
+            match choice:
+                case 1:
+                    name = get_name_contact('Ingrese el nuevo nombre: ')
+                    agenda.update_contact(contact.contact_id, {"name": name})
 
-                    case 2:
-                        email = get_email('Ingrese el nuevo email: ')
-                        contact.email = email
+                case 2:
+                    email = get_email('Ingrese el nuevo email: ')
+                    agenda.update_contact(contact.contact_id, {"email": email})
 
-                    case 3:
-                        while True:
-                            phone = get_phone_contact('Ingrese el nuevo teléfono: ')
+                case 3:
+                    phone = get_phone_contact('Ingrese el nuevo teléfono: ')
+                    agenda.update_contact(contact.contact_id, {"phone": phone})
 
-                            agenda.validate_new_phone_number(contact.phone, phone)
-                            contact.phone = phone
+                case 4:
+                    category = get_category_contact()
+                    agenda.update_contact(contact.contact_id, {"category": category})
 
-                print('\n\nContacto actualizado correctamente.\n')
-                break
-            except (DuplicatePhoneError, ContactNotFoundError) as e:
-                print(f"\nError: {e.message}.\n{e.details}\n")
-                break
+            print('\n\nContacto actualizado correctamente.\n')
+            break
+        except (DuplicateEmailError, DuplicatePhoneError, ContactNotFoundError) as e:
+            print(f"\nError: {e.message}.\n{e.details}\n")
+            break
 
 
 def get_valid_option(prompt: str, valid_options: tuple) -> int:
@@ -357,10 +374,11 @@ def get_update_field_option():
                 [1] Nombre
                 [2] Email
                 [3] Teléfono
+                [4] Categoría
                 '''
     print(UPDATE_MENU)
 
-    return get_valid_option('Seleccione una opción: ', (1, 2, 3))
+    return get_valid_option('Seleccione una opción: ', (1, 2, 3, 4))
 
 
 def should_continue(prompt: str) -> bool:
@@ -395,12 +413,13 @@ def format_relative_time(date_obj: datetime) -> str:
 def get_name(prompt: str = "Ingrese el nombre: "):
     while True:
         name = input(prompt)
+        clean_name = name.strip()
 
-        if not name.strip() or len(name) < 2:
+        if not clean_name or len(clean_name) < 2:
             print(
                 "\nEl nombre no puede estar vacío o tener menos de 2 letras. Por favor, ingrese un nombre válido.\n")
         else:
-            return name.strip()
+            return clean_name
 
 
 # Funciones para trabajar con el usuario
@@ -412,30 +431,31 @@ def get_name_user(prompt: str = "Ingrese el nombre"):
 def get_lastname(prompt: str = "Ingrese el apellido: "):
     while True:
         lastname = input(prompt)
-
-        if not lastname.strip() or len(lastname) < 2:
+        clean_lastname = lastname.strip()
+        if not clean_lastname or len(clean_lastname) < 2:
             print(
                 "\nEl apellido no puede estar vacío o tener menos de 2 letras. Por favor, ingrese un apellido válido.\n")
         else:
-            return lastname.strip()
+            return clean_lastname
 
 
 def get_username(prompt: str = "Ingrese el nombre de usuario: "):
     while True:
         username = input(prompt)
+        clean_username = username.strip()
 
-        if not username.strip() or len(username) < 3:
+        if not clean_username or len(clean_username) < 3:
             print(
                 "\nEl nombre de usuario no puede estar vacío o tener menos de 3 letras. Por favor, ingrese un nombre de usuario válido.\n")
         else:
-            return username.strip()
+            return clean_username
 
 
 def get_password(prompt: str = "Ingrese la contraseña: "):
     while True:
         password = input(prompt)
-
-        if not password.strip() or len(password) < 6:
+        clean_password = password.strip()
+        if not clean_password or len(clean_password) < 6:
             print("\nLa contraseña debe tener al menos 6 caracteres. Por favor, ingrese una contraseña válida.\n")
         else:
-            return password.strip()
+            return clean_password

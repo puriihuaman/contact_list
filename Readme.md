@@ -55,11 +55,11 @@ La aplicación debe ser capaz de:
       `UsuarioNoEncontradoError`) para delegar el manejo de la lógica de negocio a la capa de interfaz.
 - **Modularidad (Ficheros)**:
     - `src/main.py`: Punto de entrada y orquestador de las fases (Autenticación -> CRUD).
-    - `src/ui.py`: Capa de presentación. Maneja menús, formatos (fechas relativas) y atrapa (`try/except`) las excepciones.
+    - `src/view/ui.py`: Capa de presentación. Maneja menús, formatos (fechas relativas) y atrapa (`try/except`) las excepciones.
     - `src/models/`: Definición de las clases base (`Contacto`, `Agenda`, `Usuario`).
-    - `src/auth_manager.py`: Definición de la clase estática `AuthManager`.
+    - `src/auth/`: Definición de la clase estática `AuthManager`.
     - `src/exceptions/blocked_user_error.py`: Clases de errores personalizados que heredan de `Exception`.
-    - `src/config.py`: Constantes globales (ej. `CATEGORIES`).
+    - `src/models`: Enumerado de categorías.
 
 ## Flujo de Ejecución
 
